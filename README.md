@@ -34,7 +34,7 @@ The backend enforces session authentication and the Super Admin role on every ad
 
 ## Deployment
 
-The included Vercel configuration builds the UI, routes `/api/*` directly to the catch-all Express function in `api/[...path].js`, and rewrites other paths to the SPA entry point. Configure `MONGODB_URI`, `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `PRIMARY_ADMIN_EMAIL`, `CLIENT_ORIGIN`, and `ADMIN_CLIENT_ORIGIN` as server environment variables. Set `VITE_GOOGLE_CLIENT_ID` as a public frontend build variable. Add `TRUST_PROXY=true` when deployed behind Vercel's proxy. Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, and `SMTP_FROM` only if interview email delivery is needed.
+The included Vercel configuration builds the UI, routes `/api/*` through one Express function in `api/index.js`, and rewrites other paths to the SPA entry point. Configure `MONGODB_URI`, `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `PRIMARY_ADMIN_EMAIL`, `CLIENT_ORIGIN`, and `ADMIN_CLIENT_ORIGIN` as server environment variables. Set `VITE_GOOGLE_CLIENT_ID` as a public frontend build variable. Add `TRUST_PROXY=true` when deployed behind Vercel's proxy. Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, and `SMTP_FROM` only if interview email delivery is needed.
 
 Never put server secrets in `VITE_` variables or commit them. End-to-end OAuth and database workflows require configured Google OAuth and MongoDB.
 
