@@ -11,7 +11,12 @@ export async function api(path, options = {}) {
   })
 
   if (response.status === 204) return null
-  const payload = await response.json().catch(() => ({}))
+  const contentType = response.headers.get('Content-Type') || ''
+  if (!contentType.toLowerCase().includes('application/json')) {
+    if (!response.ok) throw new Error(`Request failed (${response.status}).`)
+    throw new Error('The server returned an invalid API response. Check the Vercel API deployment and routing.')
+  }
+  const payload = await response.json()
   if (!response.ok) throw new Error(payload.error || `Request failed (${response.status}).`)
   return payload
 }

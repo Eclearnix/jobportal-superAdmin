@@ -103,6 +103,7 @@ function AdminManagement({ data, onReload, onError }) {
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
   const [revokingId, setRevokingId] = useState('')
+  const [removingId, setRemovingId] = useState('')
 
   async function invite(event) {
     event.preventDefault()
@@ -129,6 +130,20 @@ function AdminManagement({ data, onReload, onError }) {
       onError(revokeError.message)
     } finally {
       setRevokingId('')
+    }
+  }
+
+  async function removeAdmin(admin) {
+    if (!window.confirm(`Remove ${admin.name || admin.email} as a Super Admin? They will lose admin access immediately.`)) return
+    setRemovingId(admin._id)
+    onError('')
+    try {
+      await api(`/admin/admins/${admin._id}`, { method: 'DELETE' })
+      await onReload()
+    } catch (removeError) {
+      onError(removeError.message)
+    } finally {
+      setRemovingId('')
     }
   }
 
@@ -169,7 +184,7 @@ function AdminManagement({ data, onReload, onError }) {
       <h2 className="subheading">Current administrators</h2>
       <div className="table-wrap">
         <table>
-          <thead><tr><th>Name</th><th>Email</th><th>Access</th><th>Status</th><th>Added</th></tr></thead>
+          <thead><tr><th>Name</th><th>Email</th><th>Access</th><th>Status</th><th>Added</th>{canManageAdmins && <th>Action</th>}</tr></thead>
           <tbody>
             {admins.length ? admins.map((admin) => (
               <tr key={admin._id}>
@@ -178,8 +193,9 @@ function AdminManagement({ data, onReload, onError }) {
                 <td>{admin.isPrimaryAdmin ? <span className="tag primary-tag">Primary admin</span> : <span className="tag">Administrator</span>}</td>
                 <td><span className="tag">{humanize(admin.status)}</span></td>
                 <td>{dateLabel(admin.createdAt)}</td>
+                {canManageAdmins && <td>{admin.isPrimaryAdmin ? '—' : <button className="text-button danger" type="button" disabled={removingId === admin._id} onClick={() => removeAdmin(admin)}>{removingId === admin._id ? 'Removing…' : 'Remove'}</button>}</td>}
               </tr>
-            )) : <tr><td className="empty-row" colSpan={5}>No administrators found.</td></tr>}
+            )) : <tr><td className="empty-row" colSpan={canManageAdmins ? 6 : 5}>No administrators found.</td></tr>}
           </tbody>
         </table>
         <div className="table-footer">{admins.length} administrator{admins.length === 1 ? '' : 's'}</div>

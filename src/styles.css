@@ -192,3 +192,65 @@ tbody tr:hover { background: #fbfcfe; }
   .login-card { padding: 35px 24px 30px; }
   .login-footer { flex-direction: column; align-items: center; gap: 4px; }
 }
+
+.eyebrow { font-size: 11px; }
+.login-card h1 { font-size: 38px; }
+.login-description { font-size: 16px; }
+.security-note { font-size: 14px; }
+.integration-notice { font-size: 14px; }
+.login-footnote, .login-footer { font-size: 13px; }
+.muted { font-size: 14px; }
+.brand strong { font-size: 16px; }
+.brand small { font-size: 9px; }
+.nav-heading { font-size: 10px; }
+.nav-item { min-height: 46px; font-size: 14px; }
+.security-chip { font-size: 12px; }
+.logout-button { min-height: 44px; padding: 12px; font-size: 14px; }
+.breadcrumb { font-size: 13px; }
+.profile strong { font-size: 13px; }
+.profile small { font-size: 12px; }
+.page-heading .eyebrow { font-size: 10px; }
+.page-heading h1 { font-size: 27px; }
+.page-heading p { font-size: 14px; }
+.metric-card span { font-size: 13px; }
+.metric-card strong { font-size: 27px; }
+.callout h2 { font-size: 15px; }
+.callout p { font-size: 14px; }
+.overview-note { font-size: 12px; }
+.table-tools { font-size: 13px; }
+.search-field input { font-size: 13px; }
+th { font-size: 11px; }
+td { font-size: 13px; }
+.tag { min-height: 25px; padding: 3px 9px; font-size: 11px; }
+.status-control select { min-height: 38px; font-size: 12px; }
+.table-footer { font-size: 12px; }
+.subheading { font-size: 15px; }
+.invite-form strong { font-size: 14px; }
+.invite-form span { font-size: 12px; }
+.invite-form input { min-height: 42px; font-size: 13px; }
+.setting-item label { font-size: 14px; }
+.setting-item label small { font-size: 12px; }
+.setting-item textarea { font-size: 13px; }
+.success-text { font-size: 12px; }
+.alert { font-size: 13px; }
+.loading-state { font-size: 14px; }
+
+.primary-button,
+.secondary-button {
+  min-height: 42px;
+  padding: 0 16px;
+  font-size: 13px;
+}
+
+.text-button { min-height: 38px; padding: 8px 12px; font-size: 13px; }
+.alert button { min-height: 38px; padding: 8px 12px; font-size: 13px; }
+
+@media (max-width: 700px) {
+  .nav-item { min-height: 42px; font-size: 13px; }
+  .security-chip { font-size: 11px; }
+  .logout-button { min-height: 40px; padding: 9px; }
+  .page-heading h1 { font-size: 23px; }
+  .metric-card span { font-size: 12px; }
+  .metric-card strong { font-size: 24px; }
+  .invite-form input { width: 100%; }
+}
