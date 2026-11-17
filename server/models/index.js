@@ -21,6 +21,7 @@ const userSchema = new Schema({
   openToOpportunities: { type: Boolean, default: false, index: true },
   resumeKey: { type: String, default: '' },
   lastLoginAt: { type: Date },
+  lastActivityAt: { type: Date, index: true },
 }, { timestamps: true, strict: 'throw' })
 
 const companySchema = new Schema({

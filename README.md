@@ -20,9 +20,11 @@ The frontend sends Google Identity Services ID tokens to `POST /api/auth/google/
 
 The backend enforces session authentication and the Super Admin role on every administrative API route. `PRIMARY_ADMIN_EMAIL` designates the only account allowed to create or revoke administrator invitations. CORS is credentialed and restricted to the configured origins.
 
+The admin overview counts candidate and recruiter accounts as registered users. “Active in last 30 days” counts unique registered users with an authenticated app/API visit in that period; activity timestamps are refreshed at most once every 15 minutes per user. This is not anonymous traffic or page-view analytics.
+
 | Method | API route | Purpose |
 |---|---|---|
-| GET | `/api/dashboard/admin` | Platform summary |
+| GET | `/api/dashboard/admin` | Platform summary, registered-user totals, new registrations, and unique users active in the last 30 days |
 | GET | `/api/admin/organizations` | Paginated organization list |
 | PATCH | `/api/admin/organizations/:companyId/status` | Update organization review status |
 | GET | `/api/admin/jobs` | Paginated jobs |

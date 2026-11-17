@@ -212,6 +212,7 @@ async function authenticateGoogle(req, res, intendedRole) {
   user.name = payload.name
   user.picture = payload.picture || user.picture
   user.lastLoginAt = new Date()
+  user.lastActivityAt = user.lastLoginAt
   if (user.status === 'suspended') {
     const error = new Error('This account is suspended. Contact platform support.')
     error.status = 403
@@ -702,9 +703,21 @@ router.post('/recruiter/applications/:applicationId/interviews', requireUser, re
 })
 
 router.get('/dashboard/admin', requireUser, requireRoles('super_admin'), async (_req, res) => {
-  const [totalCandidates, totalRecruiters, totalOrganizations, verifiedOrganizations, pendingVerifications, totalJobs, activeJobs, totalApplications] = await Promise.all([
+  const registeredUsers = { role: { $in: ['candidate', 'recruiter'] } }
+  const now = new Date()
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+  const [totalUsers, totalCandidates, totalRecruiters, activeUsersLast30Days, newUsersLast30Days, totalOrganizations, verifiedOrganizations, pendingVerifications, totalJobs, activeJobs, totalApplications] = await Promise.all([
+    User.countDocuments(registeredUsers),
     User.countDocuments({ role: 'candidate' }),
     User.countDocuments({ role: 'recruiter' }),
+    User.countDocuments({
+      ...registeredUsers,
+      $or: [
+        { lastActivityAt: { $gte: thirtyDaysAgo } },
+        { lastActivityAt: { $exists: false }, lastLoginAt: { $gte: thirtyDaysAgo } },
+      ],
+    }),
+    User.countDocuments({ ...registeredUsers, createdAt: { $gte: thirtyDaysAgo } }),
     Company.countDocuments({ status: { $ne: 'removed' } }),
     Company.countDocuments({ status: 'verified' }),
     Company.countDocuments({ status: 'pending' }),
@@ -712,7 +725,7 @@ router.get('/dashboard/admin', requireUser, requireRoles('super_admin'), async (
     Job.countDocuments({ status: 'published' }),
     Application.countDocuments(),
   ])
-  res.json({ summary: { totalCandidates, totalRecruiters, totalOrganizations, verifiedOrganizations, pendingVerifications, totalJobs, activeJobs, totalApplications } })
+  res.json({ summary: { totalUsers, totalCandidates, totalRecruiters, activeUsersLast30Days, newUsersLast30Days, totalOrganizations, verifiedOrganizations, pendingVerifications, totalJobs, activeJobs, totalApplications } })
 })
 
 router.get('/admin/organizations', requireUser, requireRoles('super_admin'), async (req, res) => {

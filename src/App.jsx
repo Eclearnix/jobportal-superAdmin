@@ -38,6 +38,13 @@ const summaryLabels = {
   totalJobs: 'All jobs',
   activeJobs: 'Published jobs',
 }
+const userSummaryLabels = {
+  totalUsers: 'Registered users',
+  totalCandidates: 'Candidates',
+  totalRecruiters: 'Recruiters',
+  activeUsersLast30Days: 'Active in last 30 days',
+  newUsersLast30Days: 'Registered in last 30 days',
+}
 
 function Login() {
   const { signIn, error: sessionError } = useAuth()
@@ -82,13 +89,27 @@ function Overview({ data }) {
   const summary = data?.summary || {}
   return (
     <>
-      <div className="metric-grid">
-        {Object.entries(summaryLabels).map(([key, label]) => (
-          <article className="metric-card" key={key}>
-            <span>{label}</span><strong>{summary[key] ?? '—'}</strong>
-          </article>
-        ))}
-      </div>
+      <section className="overview-section" aria-labelledby="user-activity-heading">
+        <h2 className="overview-section-title" id="user-activity-heading">User activity</h2>
+        <div className="metric-grid">
+          {Object.entries(userSummaryLabels).map(([key, label]) => (
+            <article className="metric-card" key={key}>
+              <span>{label}</span><strong>{summary[key]?.toLocaleString() ?? '—'}</strong>
+            </article>
+          ))}
+        </div>
+        <p className="metric-caption">Active users are registered candidates or recruiters with an authenticated app visit in the last 30 days.</p>
+      </section>
+      <section className="overview-section" aria-labelledby="platform-summary-heading">
+        <h2 className="overview-section-title" id="platform-summary-heading">Platform summary</h2>
+        <div className="metric-grid">
+          {Object.entries(summaryLabels).map(([key, label]) => (
+            <article className="metric-card" key={key}>
+              <span>{label}</span><strong>{summary[key]?.toLocaleString() ?? '—'}</strong>
+            </article>
+          ))}
+        </div>
+      </section>
       <section className="panel callout">
         <div className="callout-icon"><AlertTriangle size={18} /></div>
         <div><h2>Company verification and job moderation</h2><p>Review company applications and moderate job listings. Only verified companies can have jobs published.</p></div>

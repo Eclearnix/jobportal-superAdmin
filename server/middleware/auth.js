@@ -11,8 +11,17 @@ export async function requireUser(req, res, next) {
   } catch {
     return res.status(401).json({ error: 'Session is invalid or expired.' })
   }
-  const user = await User.findById(payload.sub).select('_id email name picture role status company phone location')
+  const user = await User.findById(payload.sub).select('_id email name picture role status company phone location lastActivityAt')
   if (!user || user.status !== 'active') return res.status(401).json({ error: 'Session is no longer active.' })
+  const now = new Date()
+  const refreshActivityAfter = new Date(now.getTime() - 15 * 60 * 1000)
+  if (!user.lastActivityAt || user.lastActivityAt < refreshActivityAfter) {
+    await User.updateOne(
+      { _id: user._id, $or: [{ lastActivityAt: { $lt: refreshActivityAfter } }, { lastActivityAt: { $exists: false } }] },
+      { $set: { lastActivityAt: now } },
+      { timestamps: false },
+    )
+  }
   req.user = user
   return next()
 }
