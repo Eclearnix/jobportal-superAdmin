@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken'
 import { Company, User } from '../models/index.js'
+import { getPrimaryAdminId } from '../admin.js'
 
 export async function requireUser(req, res, next) {
   const token = req.cookies?.ecl_session
@@ -11,7 +12,7 @@ export async function requireUser(req, res, next) {
   } catch {
     return res.status(401).json({ error: 'Session is invalid or expired.' })
   }
-  const user = await User.findById(payload.sub).select('_id email name picture role status company phone location lastActivityAt')
+  const user = await User.findById(payload.sub).select('_id email name picture role status company phone location lastActivityAt isPrimaryAdmin')
   if (!user || user.status !== 'active') return res.status(401).json({ error: 'Session is no longer active.' })
   const now = new Date()
   const refreshActivityAfter = new Date(now.getTime() - 15 * 60 * 1000)
@@ -33,10 +34,12 @@ export function requireRoles(...roles) {
   }
 }
 
-export function requirePrimaryAdmin(req, res, next) {
-  const primaryAdminEmail = process.env.PRIMARY_ADMIN_EMAIL?.trim().toLowerCase()
-  if (!primaryAdminEmail) return res.status(503).json({ error: 'Primary administrator access is not configured.' })
-  if (req.user?.email?.toLowerCase() !== primaryAdminEmail) {
+export async function requirePrimaryAdmin(req, res, next) {
+  const primaryAdminId = await getPrimaryAdminId()
+  if (!primaryAdminId) {
+    return res.status(503).json({ error: 'Primary administrator access is not configured.' })
+  }
+  if (String(req.user?._id) !== String(primaryAdminId)) {
     return res.status(403).json({ error: 'Only the primary administrator can manage administrator invitations.' })
   }
   return next()

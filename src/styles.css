@@ -134,6 +134,8 @@ tbody tr:hover { background: #fbfcfe; }
 .text-button:hover { background: #f4f6fb; }
 .text-button.danger { color: #bb4f54; }
 .text-button:disabled { opacity: .6; cursor: wait; }
+.admin-row-actions { display: flex; flex-direction: column; align-items: flex-start; }
+.admin-row-actions .text-button { text-align: left; }
 .subheading { margin: 26px 0 12px; color: #344156; font-size: 13px; }
 .invite-form { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding: 17px; border: 1px solid var(--line); border-radius: 9px; background: white; }
 .invite-form div { display: flex; min-width: 185px; flex: 1; flex-direction: column; gap: 4px; }
@@ -155,6 +157,30 @@ tbody tr:hover { background: #fbfcfe; }
 .alert { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 15px; padding: 11px 13px; border-radius: 7px; font-size: 11px; line-height: 1.5; }
 .alert.error { border: 1px solid #f1d8d8; background: #fff7f7; color: #a33f46; }
 .alert button { padding: 4px 8px; border: 0; border-radius: 4px; background: #fff; color: #a33f46; font-size: 10px; }
+.action-toast { position: fixed; top: 20px; right: 20px; z-index: 20; display: grid; grid-template-columns: 30px minmax(0, 1fr) 28px; align-items: start; gap: 11px; width: min(420px, calc(100vw - 32px)); padding: 15px 15px 18px; overflow: hidden; border: 1px solid #dcebe3; border-left: 4px solid #21815f; border-radius: 12px; background: #fff; box-shadow: 0 12px 40px #17284126; animation: toast-enter .2s ease-out; }
+.action-toast.error { border-color: #f1d8d8; border-left-color: #c64d55; }
+.action-toast-icon { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 50%; background: #edf8f2; color: #21815f; }
+.action-toast.error .action-toast-icon { background: #fff0f0; color: #b7434b; }
+.action-toast-copy { display: grid; gap: 3px; min-width: 0; color: #526177; font-size: 12px; line-height: 1.45; }
+.action-toast-copy strong { color: #26364b; font-size: 13px; }
+.action-toast-copy > span { overflow-wrap: anywhere; }
+.action-toast-dismiss { display: grid; width: 28px; height: 28px; place-items: center; border: 0; border-radius: 6px; background: transparent; color: #8491a4; }
+.action-toast-dismiss:hover { background: #f2f5f9; color: #344156; }
+.action-toast-progress { position: absolute; right: 0; bottom: 0; left: 0; height: 3px; background: #21815f; transform-origin: left; animation: toast-progress 4s linear forwards; }
+.action-toast.error .action-toast-progress { background: #c64d55; }
+.admin-confirm-backdrop { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 20px; background: #101b2c85; backdrop-filter: blur(3px); }
+.admin-confirm-dialog { width: min(460px, 100%); padding: 24px; border: 1px solid #e6ebf3; border-radius: 16px; background: #fff; box-shadow: 0 24px 70px #08142645; animation: toast-enter .18s ease-out; }
+.admin-confirm-heading { display: flex; align-items: center; gap: 12px; }
+.admin-confirm-icon { display: grid; flex: 0 0 auto; width: 38px; height: 38px; place-items: center; border-radius: 11px; background: #edf3ff; color: #4775e8; }
+.admin-confirm-icon.destructive { background: #fff0f0; color: #b7434b; }
+.admin-confirm-dialog h2 { margin: 0; color: #202e42; font-size: 17px; }
+.admin-confirm-dialog p { margin: 16px 0 0; color: #68778c; font-size: 13px; line-height: 1.6; }
+.admin-confirm-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+.destructive-button { background: #b7434b; }
+.destructive-button:hover { background: #a23941; }
+.action-toast, .admin-confirm-dialog { will-change: transform, opacity; }
+@keyframes toast-enter { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes toast-progress { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 .loading-state { display: flex; min-height: 180px; align-items: center; justify-content: center; gap: 11px; color: #78869a; font-size: 12px; }
 .spinner { width: 18px; height: 18px; border: 2px solid #d9e2f2; border-top-color: var(--blue); border-radius: 50%; animation: spin .75s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -251,6 +277,8 @@ td { font-size: 13px; }
 .alert button { min-height: 38px; padding: 8px 12px; font-size: 13px; }
 
 @media (max-width: 700px) {
+  .action-toast { top: 12px; right: 12px; }
+  .admin-confirm-actions { flex-wrap: wrap; }
   .nav-item { min-height: 42px; font-size: 13px; }
   .security-chip { font-size: 11px; }
   .logout-button { min-height: 40px; padding: 9px; }

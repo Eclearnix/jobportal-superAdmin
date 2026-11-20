@@ -8,6 +8,7 @@ const userSchema = new Schema({
   name: { type: String, required: true, trim: true, maxlength: 120 },
   picture: { type: String, default: '' },
   role: { type: String, enum: ['candidate', 'recruiter', 'super_admin'], required: true, index: true },
+  isPrimaryAdmin: { type: Boolean, default: false },
   status: { type: String, enum: ['active', 'pending', 'suspended'], default: 'active', index: true },
   company: { type: Schema.Types.ObjectId, ref: 'Company', default: null, index: true },
   title: { type: String, trim: true, maxlength: 120, default: '' },
@@ -23,6 +24,8 @@ const userSchema = new Schema({
   lastLoginAt: { type: Date },
   lastActivityAt: { type: Date, index: true },
 }, { timestamps: true, strict: 'throw' })
+
+userSchema.index({ isPrimaryAdmin: 1 }, { unique: true, partialFilterExpression: { isPrimaryAdmin: true } })
 
 const companySchema = new Schema({
   name: { type: String, required: true, trim: true, maxlength: 160 },

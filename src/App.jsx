@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Activity, AlertTriangle, BriefcaseBusiness, Building2, ChevronDown, LayoutDashboard, LogOut, Search, ShieldCheck, Users,
+  Activity, AlertCircle, AlertTriangle, BriefcaseBusiness, Building2, CheckCircle2, ChevronDown, LayoutDashboard, LogOut, Search, ShieldCheck, Users, X,
 } from 'lucide-react'
 import { AuthProvider, useAuth } from './AuthContext'
 import { api } from './api'
@@ -85,6 +85,23 @@ function Loading({ label = 'Loading secure workspace…' }) {
   return <div className="loading-state" role="status"><span className="spinner" />{label}</div>
 }
 
+function ActionToast({ toast, onDismiss }) {
+  if (!toast) return null
+  const isError = toast.type === 'error'
+  const Icon = isError ? AlertCircle : CheckCircle2
+  return (
+    <div key={toast.id} className={`action-toast ${toast.type}`} role={isError ? 'alert' : 'status'} aria-live={isError ? 'assertive' : 'polite'}>
+      <span className="action-toast-icon"><Icon size={20} /></span>
+      <span className="action-toast-copy">
+        <strong>{isError ? 'Action failed' : 'Done'}</strong>
+        <span>{toast.message}</span>
+      </span>
+      <button className="action-toast-dismiss" type="button" aria-label="Dismiss notification" onClick={onDismiss}><X size={17} /></button>
+      <span className="action-toast-progress" aria-hidden="true" />
+    </div>
+  )
+}
+
 function Overview({ data }) {
   const summary = data?.summary || {}
   return (
@@ -118,54 +135,107 @@ function Overview({ data }) {
   )
 }
 
-function AdminManagement({ data, onReload, onError }) {
+function AdminManagement({ data, onReload, onToast }) {
   const { admins = [], invites = [] } = data || {}
   const canManageAdmins = data?.currentUserIsPrimaryAdmin === true
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
   const [revokingId, setRevokingId] = useState('')
   const [removingId, setRemovingId] = useState('')
+  const [promotingId, setPromotingId] = useState('')
+  const [confirmation, setConfirmation] = useState(null)
+
+  useEffect(() => {
+    if (!confirmation) return undefined
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setConfirmation(null)
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [confirmation])
 
   async function invite(event) {
     event.preventDefault()
     setBusy(true)
-    onError('')
     try {
       await api('/admin/admin-invitations', { method: 'POST', body: { email: email.trim() } })
       setEmail('')
       await onReload()
+      onToast(`Invitation email sent to ${email.trim()}.`, 'success')
     } catch (inviteError) {
-      onError(inviteError.message)
+      onToast(inviteError.message, 'error')
     } finally {
       setBusy(false)
     }
   }
 
-  async function revoke(inviteId) {
-    setRevokingId(inviteId)
-    onError('')
-    try {
-      await api(`/admin/admin-invitations/${inviteId}`, { method: 'DELETE' })
-      await onReload()
-    } catch (revokeError) {
-      onError(revokeError.message)
-    } finally {
-      setRevokingId('')
-    }
+  function revoke(inviteItem) {
+    setConfirmation({
+      title: 'Revoke administrator invitation?',
+      message: `The invitation for ${inviteItem.email} will no longer be valid.`,
+      confirmLabel: 'Revoke invitation',
+      destructive: true,
+      onConfirm: async () => {
+        setRevokingId(inviteItem._id)
+        try {
+          await api(`/admin/admin-invitations/${inviteItem._id}`, { method: 'DELETE' })
+          await onReload()
+          onToast('Administrator invitation revoked.', 'success')
+        } catch (revokeError) {
+          onToast(revokeError.message, 'error')
+        } finally {
+          setRevokingId('')
+        }
+      },
+    })
   }
 
-  async function removeAdmin(admin) {
-    if (!window.confirm(`Remove ${admin.name || admin.email} as a Super Admin? They will lose admin access immediately.`)) return
-    setRemovingId(admin._id)
-    onError('')
-    try {
-      await api(`/admin/admins/${admin._id}`, { method: 'DELETE' })
-      await onReload()
-    } catch (removeError) {
-      onError(removeError.message)
-    } finally {
-      setRemovingId('')
-    }
+  function removeAdmin(admin) {
+    setConfirmation({
+      title: 'Remove administrator?',
+      message: `${admin.name || admin.email} will lose Super Admin access immediately.`,
+      confirmLabel: 'Remove administrator',
+      destructive: true,
+      onConfirm: async () => {
+        setRemovingId(admin._id)
+        try {
+          await api(`/admin/admins/${admin._id}`, { method: 'DELETE' })
+          await onReload()
+          onToast('Administrator removed.', 'success')
+        } catch (removeError) {
+          onToast(removeError.message, 'error')
+        } finally {
+          setRemovingId('')
+        }
+      },
+    })
+  }
+
+  function assignPrimary(admin) {
+    setConfirmation({
+      title: 'Assign primary administrator?',
+      message: `Make ${admin.name || admin.email} the primary administrator? You will remain a Super Admin but lose primary-only controls.`,
+      confirmLabel: 'Assign as primary',
+      destructive: false,
+      onConfirm: async () => {
+        setPromotingId(admin._id)
+        try {
+          await api(`/admin/admins/${admin._id}/primary`, { method: 'POST' })
+          await onReload()
+          onToast('Primary administrator updated.', 'success')
+        } catch (promoteError) {
+          onToast(promoteError.message, 'error')
+        } finally {
+          setPromotingId('')
+        }
+      },
+    })
+  }
+
+  function confirmAction() {
+    const action = confirmation?.onConfirm
+    setConfirmation(null)
+    if (action) action()
   }
 
   return (
@@ -174,11 +244,11 @@ function AdminManagement({ data, onReload, onError }) {
         <div className={`security-note admin-role-note ${canManageAdmins ? 'primary-admin-note' : ''}`}>
           <ShieldCheck size={17} />
           <span>{canManageAdmins
-            ? 'You are the primary administrator and can manage administrator invitations.'
-            : 'Only the designated primary administrator can create or revoke administrator invitations.'}</span>
+            ? 'You are the primary administrator. Accepted invitations remain administrators until you assign one as primary; you will remain a Super Admin after a transfer.'
+            : `Only ${data.primaryAdminEmail || 'the designated primary administrator'} can manage invitations or transfer primary status. Sign in with that account to manage administrators.`}</span>
         </div>
       ) : (
-        <div className="alert error" role="alert">Primary administrator is not configured. Set PRIMARY_ADMIN_EMAIL in the backend environment and restart the API.</div>
+        <div className="alert error" role="alert">No primary administrator is designated. Ensure the configured primary email belongs to an existing Super Admin.</div>
       )}
       {canManageAdmins && (
         <form className="invite-form" onSubmit={invite}>
@@ -214,7 +284,12 @@ function AdminManagement({ data, onReload, onError }) {
                 <td>{admin.isPrimaryAdmin ? <span className="tag primary-tag">Primary admin</span> : <span className="tag">Administrator</span>}</td>
                 <td><span className="tag">{humanize(admin.status)}</span></td>
                 <td>{dateLabel(admin.createdAt)}</td>
-                {canManageAdmins && <td>{admin.isPrimaryAdmin ? '—' : <button className="text-button danger" type="button" disabled={removingId === admin._id} onClick={() => removeAdmin(admin)}>{removingId === admin._id ? 'Removing…' : 'Remove'}</button>}</td>}
+                {canManageAdmins && <td>{admin.isPrimaryAdmin ? 'Current primary' : (
+                  <div className="admin-row-actions">
+                    {admin.status === 'active' && <button className="text-button" type="button" disabled={promotingId === admin._id || removingId === admin._id} onClick={() => assignPrimary(admin)}>{promotingId === admin._id ? 'Assigning…' : 'Assign as primary administrator'}</button>}
+                    <button className="text-button danger" type="button" disabled={removingId === admin._id || promotingId === admin._id} onClick={() => removeAdmin(admin)}>{removingId === admin._id ? 'Removing…' : 'Remove'}</button>
+                  </div>
+                )}</td>}
               </tr>
             )) : <tr><td className="empty-row" colSpan={canManageAdmins ? 6 : 5}>No administrators found.</td></tr>}
           </tbody>
@@ -231,13 +306,28 @@ function AdminManagement({ data, onReload, onError }) {
               <tr key={inviteItem._id}>
                 <td>{inviteItem.email}</td>
                 <td>{dateLabel(inviteItem.expiresAt)}</td>
-                <td>{canManageAdmins ? <button className="text-button danger" type="button" disabled={revokingId === inviteItem._id} onClick={() => revoke(inviteItem._id)}>{revokingId === inviteItem._id ? 'Revoking…' : 'Revoke'}</button> : '—'}</td>
+                <td>{canManageAdmins ? <button className="text-button danger" type="button" disabled={revokingId === inviteItem._id} onClick={() => revoke(inviteItem)}>{revokingId === inviteItem._id ? 'Revoking…' : 'Revoke'}</button> : '—'}</td>
               </tr>
             )) : <tr><td className="empty-row" colSpan={3}>No pending invitations.</td></tr>}
           </tbody>
         </table>
         <div className="table-footer">{invites.length} pending invitation{invites.length === 1 ? '' : 's'}</div>
       </div>
+      {confirmation && (
+        <div className="admin-confirm-backdrop">
+          <section className="admin-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="admin-confirm-title" aria-describedby="admin-confirm-message">
+            <div className="admin-confirm-heading">
+              <span className={`admin-confirm-icon ${confirmation.destructive ? 'destructive' : ''}`}><ShieldCheck size={19} /></span>
+              <h2 id="admin-confirm-title">{confirmation.title}</h2>
+            </div>
+            <p id="admin-confirm-message">{confirmation.message}</p>
+            <div className="admin-confirm-actions">
+              <button className="secondary-button" type="button" autoFocus onClick={() => setConfirmation(null)}>Cancel</button>
+              <button className={`primary-button ${confirmation.destructive ? 'destructive-button' : ''}`} type="button" onClick={confirmAction}>{confirmation.confirmLabel}</button>
+            </div>
+          </section>
+        </div>
+      )}
     </section>
   )
 }
@@ -274,9 +364,32 @@ function Dashboard() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [actionError, setActionError] = useState('')
+  const [toast, setToast] = useState(null)
+  const toastTimerRef = useRef(null)
+  const toastIdRef = useRef(0)
   const [search, setSearch] = useState('')
   const section = useMemo(() => sections.find((item) => item.id === active) || sections[0], [active])
+
+  const showToast = useCallback((message, type = 'success') => {
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current)
+    const id = toastIdRef.current + 1
+    toastIdRef.current = id
+    setToast({ id, message, type })
+    toastTimerRef.current = window.setTimeout(() => {
+      setToast((current) => current?.id === id ? null : current)
+      toastTimerRef.current = null
+    }, 4000)
+  }, [])
+
+  const dismissToast = useCallback(() => {
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current)
+    toastTimerRef.current = null
+    setToast(null)
+  }, [])
+
+  useEffect(() => () => {
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current)
+  }, [])
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -294,12 +407,12 @@ function Dashboard() {
 
   async function updateStatus(type, item, status) {
     if (status === item.status) return
-    setActionError('')
     try {
       await api(statusPath[type](item._id), { method: 'PATCH', body: { status } })
       await reload()
+      showToast(`${type === 'organizations' ? 'Organization' : 'Job'} status updated to ${humanize(status)}.`, 'success')
     } catch (updateError) {
-      setActionError(updateError.message)
+      showToast(updateError.message, 'error')
     }
   }
 
@@ -317,7 +430,7 @@ function Dashboard() {
         <div className="brand"><span className="brand-mark"><ShieldCheck size={20} /></span><span><strong>eclearnix<span>jobs</span></strong><small>PLATFORM ADMIN</small></span></div>
         <nav aria-label="Administration">
           <span className="nav-heading">WORKSPACE</span>
-          {sections.map(({ id, label, icon: Icon }) => <button key={id} type="button" className={`nav-item ${active === id ? 'active' : ''}`} onClick={() => { setActive(id); setSearch(''); setActionError('') }}><Icon size={17} /><span>{label}</span>{active === id && <span className="active-indicator" />}</button>)}
+          {sections.map(({ id, label, icon: Icon }) => <button key={id} type="button" className={`nav-item ${active === id ? 'active' : ''}`} onClick={() => { setActive(id); setSearch(''); dismissToast() }}><Icon size={17} /><span>{label}</span>{active === id && <span className="active-indicator" />}</button>)}
         </nav>
         <div className="sidebar-bottom"><div className="security-chip"><ShieldCheck size={15} /><span>Secure session</span><span className="online-dot" /></div><button type="button" className="logout-button" onClick={logout}><LogOut size={16} />Sign out</button></div>
       </aside>
@@ -326,10 +439,9 @@ function Dashboard() {
         <div className="page-content">
           <div className="page-heading"><div><span className="eyebrow">PLATFORM CONTROL CENTER</span><h1>{section.id === 'overview' ? 'Platform overview' : section.label}</h1><p>{section.id === 'overview' ? 'Review companies and moderate job listings.' : `Review and manage ${section.label.toLowerCase()} across the platform.`}</p></div><button type="button" className="secondary-button" onClick={reload}>Refresh</button></div>
           {error && <div className="alert error" role="alert">{error}<button type="button" onClick={reload}>Try again</button></div>}
-          {actionError && <div className="alert error" role="alert">{actionError}<button type="button" onClick={() => setActionError('')}>Dismiss</button></div>}
           {loading ? <Loading /> : !error && (
             <>
-              {active === 'overview' ? <Overview data={data} /> : active === 'admins' ? <AdminManagement data={data} onReload={reload} onError={setActionError} /> : (
+              {active === 'overview' ? <Overview data={data} /> : active === 'admins' ? <AdminManagement data={data} onReload={reload} onToast={showToast} /> : (
                 <>
                   {fieldSets[active] && <div className="table-tools"><label className="search-field"><Search size={16} /><input type="search" placeholder={`Search ${section.label.toLowerCase()}…`} value={search} onChange={(event) => setSearch(event.target.value)} /></label>{data?.total !== undefined && <span>{data.total.toLocaleString()} total</span>}</div>}
                   <DataTable type={active} data={data} search={search} onStatusChange={updateStatus} />
@@ -340,6 +452,7 @@ function Dashboard() {
           {active === 'overview' && <p className="overview-note"><Activity size={14} /> Data reflects the latest saved platform records.</p>}
         </div>
       </main>
+      <ActionToast toast={toast} onDismiss={dismissToast} />
     </div>
   )
 }

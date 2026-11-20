@@ -55,7 +55,7 @@ app.use((error, _req, res, _next) => {
   if (error instanceof multer.MulterError) return res.status(400).json({ error: error.message })
   const status = Number.isInteger(error.status) ? error.status : 500
   if (status >= 500) console.error(error)
-  return res.status(status).json({ error: status >= 500 ? 'The request could not be completed.' : error.message })
+  return res.status(status).json({ error: error.publicMessage || (status >= 500 ? 'The request could not be completed.' : error.message) })
 })
 
 const port = Number(process.env.PORT) || 4000

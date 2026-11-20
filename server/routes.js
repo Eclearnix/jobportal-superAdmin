@@ -20,7 +20,8 @@ import {
 } from './models/index.js'
 import { requireCompanyMember, requirePrimaryAdmin, requireRoles, requireUser } from './middleware/auth.js'
 import { savePrivateFile, streamPrivateFile } from './storage.js'
-import { sendInterviewEmail } from './email.js'
+import { sendAdminInvitationEmail, sendInterviewEmail } from './email.js'
+import { getPrimaryAdminId } from './admin.js'
 
 const router = Router()
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
@@ -175,20 +176,24 @@ async function authenticateGoogle(req, res, intendedRole) {
 
   const email = payload.email.toLowerCase()
   let user = await User.findOne({ $or: [{ email }, { googleId: payload.sub }] })
+  let adminInvite = null
   const companyInvite = intendedRole === 'recruiter'
     ? await CompanyInvite.findOne({ email, expiresAt: { $gt: new Date() } }).sort({ createdAt: -1 })
     : null
   if (intendedRole === 'super_admin') {
-    if (!user) {
-      const invite = await AdminInvite.findOneAndDelete({ email, expiresAt: { $gt: new Date() } })
-      if (invite) {
-        user = await User.create({ email, googleId: payload.sub, name: payload.name, picture: payload.picture || '', role: 'super_admin' })
-      }
-    }
-    if (!user || user.role !== 'super_admin') {
+    adminInvite = await AdminInvite.findOne({ email, expiresAt: { $gt: new Date() } })
+    if (user && user.role !== 'super_admin') {
       const error = new Error('This Google account is not authorized for Super Admin access.')
       error.status = 403
       throw error
+    }
+    if (!user && !adminInvite) {
+      const error = new Error('This Google account is not authorized for Super Admin access.')
+      error.status = 403
+      throw error
+    }
+    if (!user) {
+      user = new User({ email, googleId: payload.sub, name: payload.name, picture: payload.picture || '', role: 'super_admin' })
     }
   } else if (user && user.role !== intendedRole) {
     const error = new Error('This account belongs to a different workspace. Sign in using its assigned role.')
@@ -202,9 +207,15 @@ async function authenticateGoogle(req, res, intendedRole) {
       picture: payload.picture || '',
       role: intendedRole,
     })
-  } else if (user.googleId && user.googleId !== payload.sub) {
+  }
+  if (user.googleId && user.googleId !== payload.sub) {
     const error = new Error('This email is already linked to a different Google account.')
     error.status = 409
+    throw error
+  }
+  if (adminInvite && user.email.toLowerCase() !== email) {
+    const error = new Error('Accept this invitation using the invited Google account.')
+    error.status = 403
     throw error
   }
 
@@ -235,7 +246,41 @@ async function authenticateGoogle(req, res, intendedRole) {
     await company.save()
     await CompanyInvite.deleteOne({ _id: companyInvite._id })
   }
-  await user.save()
+  if (adminInvite) {
+    const session = await mongoose.startSession()
+    try {
+      await session.withTransaction(async () => {
+        const consumedInvite = await AdminInvite.deleteOne({
+          _id: adminInvite._id,
+          email,
+          expiresAt: { $gt: new Date() },
+        }, { session })
+        if (!consumedInvite.deletedCount) {
+          const error = new Error('The administrator invitation is no longer valid.')
+          error.status = 410
+          throw error
+        }
+
+        await user.save({ session })
+        await AdminLog.create([{
+          actor: user._id,
+          action: 'admin.invite_accepted',
+          targetType: 'user',
+          target: user._id,
+          details: { email: user.email },
+          ipAddress: req.ip,
+        }], { session })
+      })
+    } finally {
+      await session.endSession()
+    }
+  } else {
+    await user.save()
+    if (intendedRole === 'super_admin') {
+      const primaryAdminId = await getPrimaryAdminId()
+      user.isPrimaryAdmin = String(user._id) === String(primaryAdminId)
+    }
+  }
   issueSession(user, res)
   return user
 }
@@ -905,34 +950,35 @@ router.get('/admin/applications', requireUser, requireRoles('super_admin'), asyn
 })
 
 router.get('/admin/admins', requireUser, requireRoles('super_admin'), async (req, res) => {
+  const primaryAdminId = await getPrimaryAdminId()
   const [admins, invites] = await Promise.all([
-    User.find({ role: 'super_admin' }).select('name email status createdAt').sort({ createdAt: 1 }).lean(),
+    User.find({ role: 'super_admin' }).select('name email status createdAt isPrimaryAdmin').sort({ createdAt: 1 }).lean(),
     AdminInvite.find({ expiresAt: { $gt: new Date() } }).select('email expiresAt createdAt').lean(),
   ])
-  const primaryAdminEmail = process.env.PRIMARY_ADMIN_EMAIL?.trim().toLowerCase() || ''
+  const primaryAdmin = admins.find((admin) => String(admin._id) === String(primaryAdminId))
   res.json({
-    admins: admins.map((admin) => ({ ...admin, isPrimaryAdmin: admin.email.toLowerCase() === primaryAdminEmail })),
+    admins,
     invites,
-    currentUserIsPrimaryAdmin: Boolean(primaryAdminEmail) && req.user.email.toLowerCase() === primaryAdminEmail,
-    primaryAdminConfigured: Boolean(primaryAdminEmail),
+    primaryAdminEmail: primaryAdmin?.email || '',
+    currentUserIsPrimaryAdmin: String(req.user._id) === String(primaryAdminId),
+    primaryAdminConfigured: Boolean(primaryAdminId),
   })
 })
 
 router.delete('/admin/admins/:adminId', requireUser, requireRoles('super_admin'), requirePrimaryAdmin, async (req, res) => {
   const id = validate(objectId, req.params.adminId)
-  const primaryAdminEmail = process.env.PRIMARY_ADMIN_EMAIL.trim().toLowerCase()
   if (String(id) === String(req.user._id)) {
     const error = new Error('You cannot remove your own administrator account.')
     error.status = 400
     throw error
   }
-  const admin = await User.findOne({ _id: id, role: 'super_admin' }).select('email').lean()
+  const admin = await User.findOne({ _id: id, role: 'super_admin' }).select('email isPrimaryAdmin').lean()
   if (!admin) {
     const error = new Error('Secondary administrator not found.')
     error.status = 404
     throw error
   }
-  if (admin.email.toLowerCase() === primaryAdminEmail) {
+  if (admin.isPrimaryAdmin) {
     const error = new Error('The primary administrator account cannot be removed.')
     error.status = 400
     throw error
@@ -941,6 +987,7 @@ router.delete('/admin/admins/:adminId', requireUser, requireRoles('super_admin')
     const removed = await User.findOneAndDelete({
       _id: id,
       role: 'super_admin',
+      isPrimaryAdmin: { $ne: true },
       email: admin.email,
     }, { session }).select('email')
     if (!removed) {
@@ -949,6 +996,63 @@ router.delete('/admin/admins/:adminId', requireUser, requireRoles('super_admin')
       throw error
     }
     return removed
+  })
+  res.status(204).end()
+})
+
+router.post('/admin/admins/:adminId/primary', requireUser, requireRoles('super_admin'), requirePrimaryAdmin, async (req, res) => {
+  const id = validate(objectId, req.params.adminId)
+  if (String(id) === String(req.user._id)) {
+    const error = new Error('You are already the primary administrator.')
+    error.status = 400
+    throw error
+  }
+  const admin = await User.findOne({ _id: id, role: 'super_admin', status: 'active' }).select('email isPrimaryAdmin').lean()
+  if (!admin) {
+    const error = new Error('Active secondary administrator not found.')
+    error.status = 404
+    throw error
+  }
+  if (admin.isPrimaryAdmin) {
+    const error = new Error('This administrator is already the primary administrator.')
+    error.status = 409
+    throw error
+  }
+
+  await adminTransaction(req, {
+    action: 'admin.primary_transferred',
+    targetType: 'user',
+    target: id,
+    details: { email: admin.email, previousPrimaryAdminEmail: req.user.email },
+  }, async (session) => {
+    const currentPrimary = await User.findOne({ role: 'super_admin', isPrimaryAdmin: true })
+      .select('_id').session(session).lean()
+    if (!currentPrimary || String(currentPrimary._id) !== String(req.user._id)) {
+      const error = new Error('Primary administrator status changed. Refresh and try again.')
+      error.status = 409
+      throw error
+    }
+
+    const demoted = await User.updateOne(
+      { _id: currentPrimary._id, role: 'super_admin', isPrimaryAdmin: true },
+      { $set: { isPrimaryAdmin: false } },
+      { session },
+    )
+    if (!demoted.modifiedCount) {
+      const error = new Error('Primary administrator status changed. Refresh and try again.')
+      error.status = 409
+      throw error
+    }
+    const promoted = await User.updateOne(
+      { _id: id, role: 'super_admin', status: 'active', isPrimaryAdmin: { $ne: true } },
+      { $set: { isPrimaryAdmin: true } },
+      { session },
+    )
+    if (!promoted.modifiedCount) {
+      const error = new Error('The selected administrator is no longer available for promotion.')
+      error.status = 409
+      throw error
+    }
   })
   res.status(204).end()
 })
@@ -963,6 +1067,7 @@ router.post('/admin/admin-invitations', requireUser, requireRoles('super_admin')
     { email: normalizedEmail, createdBy: req.user._id, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
     { upsert: true, new: true, runValidators: true, session },
   ))
+  await sendAdminInvitationEmail({ to: normalizedEmail, inviterName: req.user.name, expiresAt: invite.expiresAt })
   res.status(201).json({ invite })
 })
 
