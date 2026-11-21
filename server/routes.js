@@ -823,10 +823,21 @@ router.delete('/admin/organizations/:companyId', requireUser, requireRoles('supe
 router.get('/admin/users', requireUser, requireRoles('super_admin'), async (req, res) => {
   const { page, limit, skip } = toPage(req.query)
   const query = {}
+  if (req.query.platformUsers === '1') query.role = { $in: ['candidate', 'recruiter'] }
   if (['candidate', 'recruiter', 'super_admin'].includes(req.query.role)) query.role = req.query.role
   if (['active', 'pending', 'suspended'].includes(req.query.status)) query.status = req.query.status
+  if (req.query.active30days === '1' || req.query.new30days === '1') {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    if (req.query.active30days === '1') {
+      query.$or = [
+        { lastActivityAt: { $gte: thirtyDaysAgo } },
+        { lastActivityAt: { $exists: false }, lastLoginAt: { $gte: thirtyDaysAgo } },
+      ]
+    }
+    if (req.query.new30days === '1') query.createdAt = { $gte: thirtyDaysAgo }
+  }
   const [items, total] = await Promise.all([
-    User.find(query).select('name email role status company createdAt').sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+    User.find(query).select('name email role status company title phone location skills createdAt lastLoginAt lastActivityAt').sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
     User.countDocuments(query),
   ])
   res.json({ items, page, limit, total, pages: Math.ceil(total / limit) })

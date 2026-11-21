@@ -155,17 +155,114 @@ function ActionToast({ toast, onDismiss }) {
   )
 }
 
+function MetricDetailModal({ detail, onClose }) {
+  useEffect(() => {
+    if (!detail) return undefined
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [detail, onClose])
+
+  if (!detail) return null
+  const { title, items = [], loading, error, columns } = detail
+
+  return (
+    <div className="metric-detail-backdrop" role="presentation" onMouseDown={(event) => {
+      if (event.target === event.currentTarget) onClose()
+    }}>
+      <section className="metric-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="metric-detail-title">
+        <div className="metric-detail-heading">
+          <div><span className="eyebrow">DETAILS</span><h2 id="metric-detail-title">{title}</h2></div>
+          <button className="action-toast-dismiss" type="button" aria-label="Close details" onClick={onClose}><X size={18} /></button>
+        </div>
+        {loading ? <Loading label="Loading details…" /> : error ? (
+          <div className="alert error" role="alert">{error}</div>
+        ) : (
+          <div className="table-wrap metric-detail-table">
+            <table>
+              <thead><tr>{columns.map((column) => <th key={column.key}>{column.label}</th>)}</tr></thead>
+              <tbody>
+                {items.length ? items.map((item) => (
+                  <tr key={item._id || item.email || item.name}>
+                    {columns.map((column) => {
+                      const value = fieldValue(item, column.key)
+                      const display = column.date ? dateLabel(value) : column.status ? <span className="tag">{humanize(value)}</span> : String(value ?? '—')
+                      return <td key={column.key}>{display}</td>
+                    })}
+                  </tr>
+                )) : <tr><td className="empty-row" colSpan={columns.length}>No records found.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <div className="metric-detail-footer">{loading ? '' : `${items.length} record${items.length === 1 ? '' : 's'} shown`}</div>
+      </section>
+    </div>
+  )
+}
+
 function Overview({ data }) {
   const summary = data?.summary || {}
+  const [detail, setDetail] = useState(null)
+
+  const closeDetail = useCallback(() => setDetail(null), [])
+
+  const metricConfigs = useMemo(() => ({
+    totalUsers: { title: 'Registered users', path: '/admin/users?platformUsers=1&limit=100', columns: [
+      { key: 'name', label: 'Name' }, { key: 'email', label: 'Email' }, { key: 'role', label: 'Role' }, { key: 'status', label: 'Status', status: true }, { key: 'createdAt', label: 'Joined', date: true },
+    ] },
+    totalCandidates: { title: 'Candidates', path: '/admin/users?role=candidate&limit=100', columns: [
+      { key: 'name', label: 'Name' }, { key: 'email', label: 'Email' }, { key: 'title', label: 'Title' }, { key: 'location', label: 'Location' }, { key: 'status', label: 'Status', status: true },
+    ] },
+    totalRecruiters: { title: 'Recruiters', path: '/admin/users?role=recruiter&limit=100', columns: [
+      { key: 'name', label: 'Name' }, { key: 'email', label: 'Email' }, { key: 'location', label: 'Location' }, { key: 'status', label: 'Status', status: true }, { key: 'createdAt', label: 'Joined', date: true },
+    ] },
+    activeUsersLast30Days: { title: 'Active users in the last 30 days', path: '/admin/users?platformUsers=1&active30days=1&limit=100', columns: [
+      { key: 'name', label: 'Name' }, { key: 'email', label: 'Email' }, { key: 'role', label: 'Role' }, { key: 'lastActivityAt', label: 'Last active', date: true }, { key: 'lastLoginAt', label: 'Last login', date: true },
+    ] },
+    newUsersLast30Days: { title: 'Users registered in the last 30 days', path: '/admin/users?platformUsers=1&new30days=1&limit=100', columns: [
+      { key: 'name', label: 'Name' }, { key: 'email', label: 'Email' }, { key: 'role', label: 'Role' }, { key: 'status', label: 'Status', status: true }, { key: 'createdAt', label: 'Joined', date: true },
+    ] },
+    totalOrganizations: { title: 'Organizations', path: '/admin/organizations?limit=100', columns: [
+      { key: 'name', label: 'Organization' }, { key: 'contactEmail', label: 'Email' }, { key: 'industry', label: 'Industry' }, { key: 'location', label: 'Location' }, { key: 'status', label: 'Status', status: true },
+    ] },
+    verifiedOrganizations: { title: 'Verified organizations', path: '/admin/organizations?status=verified&limit=100', columns: [
+      { key: 'name', label: 'Organization' }, { key: 'contactEmail', label: 'Email' }, { key: 'industry', label: 'Industry' }, { key: 'location', label: 'Location' }, { key: 'createdAt', label: 'Registered', date: true },
+    ] },
+    pendingVerifications: { title: 'Pending organization reviews', path: '/admin/organizations?status=pending&limit=100', columns: [
+      { key: 'name', label: 'Organization' }, { key: 'contactEmail', label: 'Email' }, { key: 'website', label: 'Website' }, { key: 'location', label: 'Location' }, { key: 'createdAt', label: 'Submitted', date: true },
+    ] },
+    totalJobs: { title: 'All jobs', path: '/admin/jobs?limit=100', columns: [
+      { key: 'title', label: 'Job' }, { key: 'company.name', label: 'Organization' }, { key: 'location', label: 'Location' }, { key: 'workMode', label: 'Work mode' }, { key: 'status', label: 'Status', status: true },
+    ] },
+    activeJobs: { title: 'Published jobs', path: '/admin/jobs?status=published&limit=100', columns: [
+      { key: 'title', label: 'Job' }, { key: 'company.name', label: 'Organization' }, { key: 'location', label: 'Location' }, { key: 'employmentType', label: 'Type' }, { key: 'publishedAt', label: 'Published', date: true },
+    ] },
+  }), [])
+
+  async function openMetric(key, label) {
+    const config = metricConfigs[key]
+    if (!config) return
+    setDetail({ title: label, items: [], columns: config.columns, loading: true, error: '' })
+    try {
+      const response = await api(config.path)
+      setDetail({ title: label, items: response.items || [], columns: config.columns, loading: false, error: '' })
+    } catch (detailError) {
+      setDetail({ title: label, items: [], columns: config.columns, loading: false, error: detailError.message })
+    }
+  }
+
   return (
     <>
       <section className="overview-section" aria-labelledby="user-activity-heading">
         <h2 className="overview-section-title" id="user-activity-heading">User activity</h2>
         <div className="metric-grid">
           {Object.entries(userSummaryLabels).map(([key, label]) => (
-            <article className="metric-card" key={key}>
-              <span>{label}</span><strong>{summary[key]?.toLocaleString() ?? '—'}</strong>
-            </article>
+            <button type="button" className="metric-card" key={key} onClick={() => openMetric(key, label)}>
+              <span>{label}</span><strong>{summary[key]?.toLocaleString() ?? '—'}</strong><small>View details</small>
+            </button>
           ))}
         </div>
         <p className="metric-caption">Active users are registered candidates or recruiters with an authenticated app visit in the last 30 days.</p>
@@ -174,9 +271,9 @@ function Overview({ data }) {
         <h2 className="overview-section-title" id="platform-summary-heading">Platform summary</h2>
         <div className="metric-grid">
           {Object.entries(summaryLabels).map(([key, label]) => (
-            <article className="metric-card" key={key}>
-              <span>{label}</span><strong>{summary[key]?.toLocaleString() ?? '—'}</strong>
-            </article>
+            <button type="button" className="metric-card" key={key} onClick={() => openMetric(key, label)}>
+              <span>{label}</span><strong>{summary[key]?.toLocaleString() ?? '—'}</strong><small>View details</small>
+            </button>
           ))}
         </div>
       </section>
@@ -184,6 +281,7 @@ function Overview({ data }) {
         <div className="callout-icon"><AlertTriangle size={18} /></div>
         <div><h2>Company verification and job moderation</h2><p>Review company applications and moderate job listings. Only verified companies can have jobs published.</p></div>
       </section>
+      <MetricDetailModal detail={detail} onClose={closeDetail} />
     </>
   )
 }
