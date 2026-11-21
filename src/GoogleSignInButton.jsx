@@ -44,7 +44,11 @@ export default function GoogleSignInButton({ onCredential, disabled }) {
         auto_select: false,
         cancel_on_tap_outside: true,
       })
-      const renderButton = () => {
+      let renderedWidth = 0
+      const renderButton = (force = false) => {
+        const width = Math.max(200, Math.min(360, Math.floor(container.clientWidth)))
+        if (!force && width === renderedWidth) return
+        renderedWidth = width
         container.replaceChildren()
         google.accounts.id.renderButton(container, {
           type: 'standard',
@@ -52,13 +56,13 @@ export default function GoogleSignInButton({ onCredential, disabled }) {
           size: 'large',
           shape: 'rectangular',
           text: 'continue_with',
-          width: Math.max(200, Math.min(360, Math.floor(container.clientWidth))),
+          width,
           locale: 'en',
         })
       }
-      renderButton()
+      renderButton(true)
       if (typeof ResizeObserver !== 'undefined') {
-        resizeObserver = new ResizeObserver(renderButton)
+        resizeObserver = new ResizeObserver(() => renderButton())
         resizeObserver.observe(container)
       }
     }).catch((loadError) => {

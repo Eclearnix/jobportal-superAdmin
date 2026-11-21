@@ -103,6 +103,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   max-width: 362px;
   margin-inline: 0;
   border-radius: 10px;
+  cursor: pointer;
   transition: box-shadow .25s ease;
 }
 .google-signin-glow .border-glow-inner { overflow: visible; }
