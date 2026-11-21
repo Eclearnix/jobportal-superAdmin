@@ -5,6 +5,8 @@ import {
 import { AuthProvider, useAuth } from './AuthContext'
 import { api } from './api'
 import GoogleSignInButton from './GoogleSignInButton'
+import { AuroraBackground } from './components/ui/aurora-background'
+import BorderGlow from './components/ui/BorderGlow'
 
 const sections = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard, endpoint: '/dashboard/admin' },
@@ -49,35 +51,85 @@ const userSummaryLabels = {
 function Login() {
   const { signIn, error: sessionError } = useAuth()
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
+  const [warning, setWarning] = useState(null)
+  const warningTimerRef = useRef(null)
+  const warningIdRef = useRef(0)
+
+  const showWarning = useCallback((message) => {
+    if (warningTimerRef.current) window.clearTimeout(warningTimerRef.current)
+    const id = warningIdRef.current + 1
+    warningIdRef.current = id
+    setWarning({ id, message, type: 'warning' })
+    warningTimerRef.current = window.setTimeout(() => {
+      setWarning((current) => current?.id === id ? null : current)
+      warningTimerRef.current = null
+    }, 4000)
+  }, [])
+
+  const dismissWarning = useCallback(() => {
+    if (warningTimerRef.current) window.clearTimeout(warningTimerRef.current)
+    warningTimerRef.current = null
+    setWarning(null)
+  }, [])
+
+  useEffect(() => () => {
+    if (warningTimerRef.current) window.clearTimeout(warningTimerRef.current)
+  }, [])
+
+  useEffect(() => {
+    if (sessionError) showWarning(sessionError)
+  }, [sessionError, showWarning])
 
   const acceptCredential = useCallback(async (credential) => {
     setBusy(true)
-    setError('')
     try {
       await signIn(credential)
     } catch (signInError) {
-      setError(signInError.message)
+      showWarning(signInError.message)
     } finally {
       setBusy(false)
     }
-  }, [signIn])
+  }, [signIn, showWarning])
 
   return (
-    <main className="login-shell">
-      <section className="login-card">
-        <div className="brand-mark"><ShieldCheck size={25} /></div>
-        <span className="eyebrow">ECLEARNIX JOBS · PLATFORM CONTROL</span>
-        <h1>Super Admin<br />sign in</h1>
-        <p className="login-description">Restricted access for authorized platform administrators.</p>
-        <div className="security-note"><ShieldCheck size={17} /><span>Administrator access is invite-only and verified by the backend.</span></div>
-        <GoogleSignInButton onCredential={acceptCredential} disabled={busy} />
-        {busy && <p className="muted center" role="status">Verifying your Google account…</p>}
-        {(error || sessionError) && <p className="alert error" role="alert">{error || sessionError}</p>}
-        <p className="login-footnote">Use the Google account registered for your administrator invitation.</p>
-      </section>
-      <footer className="login-footer">© {new Date().getFullYear()} Eclearnix Jobs <span>Secure platform administration</span></footer>
-    </main>
+    <>
+      <main className="login-shell">
+        <AuroraBackground className="login-page-background" showRadialGradient={false}>
+          <section className="login-card">
+            <div className="login-intro">
+              <div className="brand-mark"><ShieldCheck size={25} /></div>
+              <span className="eyebrow">ECLEARNIX JOBS · PLATFORM CONTROL</span>
+              <h1>Super Admin<br />sign in</h1>
+              <p className="login-description">Restricted access for authorized platform administrators.</p>
+              <footer className="login-footer">© {new Date().getFullYear()} Eclearnix Jobs <span>Secure platform administration</span></footer>
+            </div>
+            <div className="login-access">
+              <div className="login-access-heading">
+                <span className="login-access-kicker">ADMINISTRATOR ACCESS</span>
+                <h2>Welcome back</h2>
+                <p>Continue with the Google account registered for your administrator invitation.</p>
+              </div>
+              <div className="login-trust"><ShieldCheck size={18} /><span>Invite-only access, securely verified</span></div>
+              <BorderGlow
+                className="google-signin-glow"
+                edgeSensitivity={35}
+                glowColor="215 90 65"
+                backgroundColor="#ffffff"
+                borderRadius={10}
+                glowRadius={22}
+                glowIntensity={1}
+                coneSpread={35}
+                colors={['#3b82f6', '#a5b4fc', '#60a5fa']}
+              >
+                <GoogleSignInButton onCredential={acceptCredential} disabled={busy} />
+              </BorderGlow>
+              {busy && <p className="muted center" role="status">Verifying your Google account…</p>}
+            </div>
+          </section>
+        </AuroraBackground>
+      </main>
+      <ActionToast toast={warning} onDismiss={dismissWarning} />
+    </>
   )
 }
 
@@ -88,12 +140,13 @@ function Loading({ label = 'Loading secure workspace…' }) {
 function ActionToast({ toast, onDismiss }) {
   if (!toast) return null
   const isError = toast.type === 'error'
-  const Icon = isError ? AlertCircle : CheckCircle2
+  const isWarning = toast.type === 'warning'
+  const Icon = isWarning ? AlertTriangle : isError ? AlertCircle : CheckCircle2
   return (
-    <div key={toast.id} className={`action-toast ${toast.type}`} role={isError ? 'alert' : 'status'} aria-live={isError ? 'assertive' : 'polite'}>
+    <div key={toast.id} className={`action-toast ${toast.type}`} role={isError || isWarning ? 'alert' : 'status'} aria-live={isError || isWarning ? 'assertive' : 'polite'}>
       <span className="action-toast-icon"><Icon size={20} /></span>
       <span className="action-toast-copy">
-        <strong>{isError ? 'Action failed' : 'Done'}</strong>
+        <strong>{isWarning ? 'Warning' : isError ? 'Action failed' : 'Done'}</strong>
         <span>{toast.message}</span>
       </span>
       <button className="action-toast-dismiss" type="button" aria-label="Dismiss notification" onClick={onDismiss}><X size={17} /></button>

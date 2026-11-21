@@ -31,6 +31,7 @@ export default function GoogleSignInButton({ onCredential, disabled }) {
     const container = buttonRef.current
     if (!clientId || !container) return undefined
     const generation = ++generationRef.current
+    let resizeObserver
 
     loadGoogleIdentity().then((google) => {
       if (generation !== generationRef.current || !container.isConnected) return
@@ -43,22 +44,30 @@ export default function GoogleSignInButton({ onCredential, disabled }) {
         auto_select: false,
         cancel_on_tap_outside: true,
       })
-      container.replaceChildren()
-      google.accounts.id.renderButton(container, {
-        type: 'standard',
-        theme: 'outline',
-        size: 'large',
-        shape: 'rectangular',
-        text: 'continue_with',
-        width: 360,
-        locale: 'en',
-      })
+      const renderButton = () => {
+        container.replaceChildren()
+        google.accounts.id.renderButton(container, {
+          type: 'standard',
+          theme: 'filled_black',
+          size: 'large',
+          shape: 'rectangular',
+          text: 'continue_with',
+          width: Math.max(200, Math.min(360, Math.floor(container.clientWidth))),
+          locale: 'en',
+        })
+      }
+      renderButton()
+      if (typeof ResizeObserver !== 'undefined') {
+        resizeObserver = new ResizeObserver(renderButton)
+        resizeObserver.observe(container)
+      }
     }).catch((loadError) => {
       if (generation === generationRef.current) setError(loadError.message)
     })
 
     return () => {
       generationRef.current += 1
+      resizeObserver?.disconnect()
       container.replaceChildren()
     }
   }, [clientId])

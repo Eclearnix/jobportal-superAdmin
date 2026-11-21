@@ -1,0 +1,92 @@
+.aurora-background {
+  /* Edit these values to customize the animated background palette. */
+  --aurora-base-color: #fff;
+  --aurora-overlay-color: #fff;
+  --aurora-color-1: #3b82f6;
+  --aurora-color-2: #a5b4fc;
+  --aurora-color-3: #93c5fd;
+  --aurora-color-4: #ddd6fe;
+  --aurora-color-5: #60a5fa;
+  --aurora-opacity: .3;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--aurora-base-color);
+}
+
+.aurora-background__effect {
+  position: absolute;
+  z-index: 0;
+  inset: -10px;
+  overflow: hidden;
+  opacity: var(--aurora-opacity);
+  background-image:
+    repeating-linear-gradient(
+      100deg,
+      var(--aurora-overlay-color) 0%,
+      var(--aurora-overlay-color) 7%,
+      transparent 10%,
+      transparent 12%,
+      var(--aurora-overlay-color) 16%
+    ),
+    repeating-linear-gradient(
+      100deg,
+      var(--aurora-color-1) 10%,
+      var(--aurora-color-2) 15%,
+      var(--aurora-color-3) 20%,
+      var(--aurora-color-4) 25%,
+      var(--aurora-color-5) 30%
+    );
+  background-size: 300% 200%;
+  background-position: 50% 50%;
+  filter: blur(10px);
+  pointer-events: none;
+  will-change: transform;
+}
+
+.aurora-background--radial .aurora-background__effect {
+  mask-image: radial-gradient(ellipse at 100% 0%, #000 10%, transparent 70%);
+}
+
+.aurora-background__effect::after {
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(
+      100deg,
+      var(--aurora-overlay-color) 0%,
+      var(--aurora-overlay-color) 7%,
+      transparent 10%,
+      transparent 12%,
+      var(--aurora-overlay-color) 16%
+    ),
+    repeating-linear-gradient(
+      100deg,
+      var(--aurora-color-1) 10%,
+      var(--aurora-color-2) 15%,
+      var(--aurora-color-3) 20%,
+      var(--aurora-color-4) 25%,
+      var(--aurora-color-5) 30%
+    );
+  background-size: 200% 100%;
+  background-attachment: fixed;
+  animation: aurora-background-shift 60s linear infinite;
+  content: '';
+  mix-blend-mode: normal;
+  pointer-events: none;
+}
+
+.aurora-background__content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+}
+
+@keyframes aurora-background-shift {
+  from { background-position: 50% 50%; }
+  to { background-position: 350% 50%; }
+}
