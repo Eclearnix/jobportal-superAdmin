@@ -166,7 +166,9 @@ function MetricDetailModal({ detail, onClose }) {
   }, [detail, onClose])
 
   if (!detail) return null
-  const { title, items = [], loading, error, columns } = detail
+  const { title, items = [], loading, error, columns, total } = detail
+  const shownCount = items.length
+  const totalCount = typeof total === 'number' ? total : shownCount
 
   return (
     <div className="metric-detail-backdrop" role="presentation" onMouseDown={(event) => {
@@ -174,7 +176,13 @@ function MetricDetailModal({ detail, onClose }) {
     }}>
       <section className="metric-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="metric-detail-title">
         <div className="metric-detail-heading">
-          <div><span className="eyebrow">DETAILS</span><h2 id="metric-detail-title">{title}</h2></div>
+          <div>
+            <span className="eyebrow">DETAILS</span>
+            <div className="metric-detail-title-row">
+              <h2 id="metric-detail-title">{title}</h2>
+              {!loading && !error && <span className="metric-detail-count">{totalCount.toLocaleString()} total</span>}
+            </div>
+          </div>
           <button className="action-toast-dismiss" type="button" aria-label="Close details" onClick={onClose}><X size={18} /></button>
         </div>
         {loading ? <Loading label="Loading details…" /> : error ? (
@@ -197,7 +205,7 @@ function MetricDetailModal({ detail, onClose }) {
             </table>
           </div>
         )}
-        <div className="metric-detail-footer">{loading ? '' : `${items.length} record${items.length === 1 ? '' : 's'} shown`}</div>
+        <div className="metric-detail-footer">{loading ? '' : `${shownCount.toLocaleString()} shown · ${totalCount.toLocaleString()} total`}</div>
       </section>
     </div>
   )
@@ -245,12 +253,13 @@ function Overview({ data }) {
   async function openMetric(key, label) {
     const config = metricConfigs[key]
     if (!config) return
-    setDetail({ title: label, items: [], columns: config.columns, loading: true, error: '' })
+    setDetail({ title: label, items: [], columns: config.columns, total: typeof summary[key] === 'number' ? summary[key] : null, loading: true, error: '' })
     try {
       const response = await api(config.path)
-      setDetail({ title: label, items: response.items || [], columns: config.columns, loading: false, error: '' })
+      const total = typeof response.total === 'number' ? response.total : (typeof summary[key] === 'number' ? summary[key] : (response.items || []).length)
+      setDetail({ title: label, items: response.items || [], columns: config.columns, total, loading: false, error: '' })
     } catch (detailError) {
-      setDetail({ title: label, items: [], columns: config.columns, loading: false, error: detailError.message })
+      setDetail({ title: label, items: [], columns: config.columns, total: typeof summary[key] === 'number' ? summary[key] : null, loading: false, error: detailError.message })
     }
   }
 

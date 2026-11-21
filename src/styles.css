@@ -181,6 +181,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .metric-detail-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px 22px 14px; }
 .metric-detail-heading .eyebrow { display: block; margin: 0 0 5px; }
 .metric-detail-heading h2 { margin: 0; color: var(--navy); font-size: 20px; }
+.metric-detail-title-row { display: flex; align-items: center; gap: 10px; }
+.metric-detail-count { display: inline-flex; min-height: 24px; align-items: center; padding: 3px 9px; border-radius: 999px; background: #edf3ff; color: #4168c4; font-size: 11px; font-weight: 700; }
 .metric-detail-table { max-height: calc(100vh - 190px); overflow: auto; border-right: 0; border-left: 0; border-radius: 0; }
 .metric-detail-footer { padding: 10px 22px 14px; color: #8895a7; font-size: 11px; }
 .callout { display: flex; align-items: flex-start; gap: 14px; margin-top: 22px; padding: 20px; border: 1px solid #e5eaf2; border-radius: 10px; background: #fff; }
