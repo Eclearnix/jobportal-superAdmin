@@ -21,7 +21,7 @@ import {
 import { requireCompanyMember, requirePrimaryAdmin, requireRoles, requireUser } from './middleware/auth.js'
 import { savePrivateFile, streamPrivateFile } from './storage.js'
 import { sendAdminInvitationEmail, sendInterviewEmail } from './email.js'
-import { getPrimaryAdminId } from './admin.js'
+import { getConfiguredPrimaryAdminEmail, getPrimaryAdminId } from './admin.js'
 
 const router = Router()
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
@@ -971,6 +971,7 @@ router.get('/admin/admins', requireUser, requireRoles('super_admin'), async (req
     admins,
     invites,
     primaryAdminEmail: primaryAdmin?.email || '',
+    configuredPrimaryAdminEmail: getConfiguredPrimaryAdminEmail(),
     currentUserIsPrimaryAdmin: String(req.user._id) === String(primaryAdminId),
     primaryAdminConfigured: Boolean(primaryAdminId),
   })

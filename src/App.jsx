@@ -450,7 +450,9 @@ function AdminManagement({ data, onReload, onToast }) {
             : `Only ${data.primaryAdminEmail || 'the designated primary administrator'} can manage invitations or transfer primary status. Sign in with that account to manage administrators.`}</span>
         </div>
       ) : (
-        <div className="alert error" role="alert">No primary administrator is designated. Ensure the configured primary email belongs to an existing Super Admin.</div>
+        <div className="alert error" role="alert">
+          No primary administrator is designated. The API is configured for <strong>{data.configuredPrimaryAdminEmail || 'no primary email'}</strong>. Ensure this exact email belongs to an existing Super Admin, then verify the production API configuration and deployment.
+        </div>
       )}
       {canManageAdmins && (
         <form className="invite-form" onSubmit={invite}>
