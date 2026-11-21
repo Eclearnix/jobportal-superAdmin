@@ -212,10 +212,52 @@ function MetricDetailModal({ detail, onClose }) {
 }
 
 function Overview({ data }) {
-  const summary = data?.summary || {}
+  const summary = useMemo(() => data?.summary || {}, [data])
   const [detail, setDetail] = useState(null)
+  const [resolvedSummary, setResolvedSummary] = useState(summary)
 
   const closeDetail = useCallback(() => setDetail(null), [])
+
+  useEffect(() => {
+    let cancelled = false
+    setResolvedSummary(summary)
+
+    async function resolveMissingUserCounts() {
+      const nextSummary = { ...summary }
+      const candidateCount = Number.isFinite(summary.totalCandidates) ? summary.totalCandidates : 0
+      const recruiterCount = Number.isFinite(summary.totalRecruiters) ? summary.totalRecruiters : 0
+
+      if (!Number.isFinite(nextSummary.totalUsers)) {
+        nextSummary.totalUsers = candidateCount + recruiterCount
+      }
+
+      if (!Number.isFinite(nextSummary.activeUsersLast30Days) || !Number.isFinite(nextSummary.newUsersLast30Days)) {
+        try {
+          const response = await api('/admin/users?platformUsers=1&limit=100')
+          const users = (response.items || []).filter((item) => item.role === 'candidate' || item.role === 'recruiter')
+          const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+
+          if (!Number.isFinite(nextSummary.activeUsersLast30Days)) {
+            nextSummary.activeUsersLast30Days = users.filter((item) => {
+              const activity = item.lastActivityAt || (item.lastActivityAt == null ? item.lastLoginAt : null)
+              return activity ? new Date(activity) >= thirtyDaysAgo : false
+            }).length
+          }
+          if (!Number.isFinite(nextSummary.newUsersLast30Days)) {
+            nextSummary.newUsersLast30Days = users.filter((item) => item.createdAt && new Date(item.createdAt) >= thirtyDaysAgo).length
+          }
+        } catch {
+          if (!Number.isFinite(nextSummary.activeUsersLast30Days)) nextSummary.activeUsersLast30Days = 0
+          if (!Number.isFinite(nextSummary.newUsersLast30Days)) nextSummary.newUsersLast30Days = 0
+        }
+      }
+
+      if (!cancelled) setResolvedSummary(nextSummary)
+    }
+
+    resolveMissingUserCounts()
+    return () => { cancelled = true }
+  }, [summary])
 
   const metricConfigs = useMemo(() => ({
     totalUsers: { title: 'Registered users', path: '/admin/users?platformUsers=1&limit=100', columns: [
@@ -253,13 +295,13 @@ function Overview({ data }) {
   async function openMetric(key, label) {
     const config = metricConfigs[key]
     if (!config) return
-    setDetail({ title: label, items: [], columns: config.columns, total: typeof summary[key] === 'number' ? summary[key] : null, loading: true, error: '' })
+    setDetail({ title: label, items: [], columns: config.columns, total: typeof resolvedSummary[key] === 'number' ? resolvedSummary[key] : null, loading: true, error: '' })
     try {
       const response = await api(config.path)
-      const total = typeof response.total === 'number' ? response.total : (typeof summary[key] === 'number' ? summary[key] : (response.items || []).length)
+      const total = typeof response.total === 'number' ? response.total : (typeof resolvedSummary[key] === 'number' ? resolvedSummary[key] : (response.items || []).length)
       setDetail({ title: label, items: response.items || [], columns: config.columns, total, loading: false, error: '' })
     } catch (detailError) {
-      setDetail({ title: label, items: [], columns: config.columns, total: typeof summary[key] === 'number' ? summary[key] : null, loading: false, error: detailError.message })
+      setDetail({ title: label, items: [], columns: config.columns, total: typeof resolvedSummary[key] === 'number' ? resolvedSummary[key] : null, loading: false, error: detailError.message })
     }
   }
 
@@ -270,7 +312,7 @@ function Overview({ data }) {
         <div className="metric-grid">
           {Object.entries(userSummaryLabels).map(([key, label]) => (
             <button type="button" className="metric-card" key={key} onClick={() => openMetric(key, label)}>
-              <span>{label}</span><strong>{summary[key]?.toLocaleString() ?? '—'}</strong><small>View details</small>
+              <span>{label}</span><strong>{Number.isFinite(resolvedSummary[key]) ? resolvedSummary[key].toLocaleString() : '0'}</strong><small>View details</small>
             </button>
           ))}
         </div>
@@ -281,7 +323,7 @@ function Overview({ data }) {
         <div className="metric-grid">
           {Object.entries(summaryLabels).map(([key, label]) => (
             <button type="button" className="metric-card" key={key} onClick={() => openMetric(key, label)}>
-              <span>{label}</span><strong>{summary[key]?.toLocaleString() ?? '—'}</strong><small>View details</small>
+              <span>{label}</span><strong>{Number.isFinite(resolvedSummary[key]) ? resolvedSummary[key].toLocaleString() : '0'}</strong><small>View details</small>
             </button>
           ))}
         </div>
